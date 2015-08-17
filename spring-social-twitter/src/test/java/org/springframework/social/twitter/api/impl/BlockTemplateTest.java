@@ -15,28 +15,29 @@
  */
 package org.springframework.social.twitter.api.impl;
 
-import static org.junit.Assert.*;
-import static org.springframework.http.HttpMethod.*;
-import static org.springframework.http.MediaType.*;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
-
 import org.junit.Test;
 import org.springframework.social.twitter.api.CursoredList;
 import org.springframework.social.twitter.api.TwitterProfile;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 
 /**
  * @author Craig Walls
  */
 public class BlockTemplateTest extends AbstractTwitterApiTest {
-	
+
 	@Test
 	public void block_userId() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/create.json"))
-			.andExpect(method(POST))
-			.andExpect(content().string("user_id=12345"))
-			.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
+				.andExpect(method(POST))
+				.andExpect(content().string("user_id=12345"))
+				.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
 		TwitterProfile blockedUser = twitter.blockOperations().block(12345);
 		assertTwitterProfile(blockedUser);
 		mockServer.verify();
@@ -45,50 +46,50 @@ public class BlockTemplateTest extends AbstractTwitterApiTest {
 	@Test
 	public void block_screenName() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/create.json"))
-			.andExpect(method(POST))
-			.andExpect(content().string("screen_name=habuma"))
-			.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
+				.andExpect(method(POST))
+				.andExpect(content().string("screen_name=habuma"))
+				.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
 		TwitterProfile blockedUser = twitter.blockOperations().block("habuma");
 		assertTwitterProfile(blockedUser);
 		mockServer.verify();
-	}	
+	}
 
 	@Test
 	public void unblock_userId() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/destroy.json"))
-			.andExpect(method(POST))
-			.andExpect(content().string("user_id=12345"))
-			.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
+				.andExpect(method(POST))
+				.andExpect(content().string("user_id=12345"))
+				.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
 		TwitterProfile blockedUser = twitter.blockOperations().unblock(12345);
 		assertTwitterProfile(blockedUser);
 		mockServer.verify();
 	}
-	
+
 	@Test
 	public void unblock_screenName() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/destroy.json"))
-			.andExpect(method(POST))
-			.andExpect(content().string("screen_name=habuma"))
-			.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
+				.andExpect(method(POST))
+				.andExpect(content().string("screen_name=habuma"))
+				.andRespond(withSuccess(jsonResource("twitter-profile"), APPLICATION_JSON));
 		TwitterProfile blockedUser = twitter.blockOperations().unblock("habuma");
 		assertTwitterProfile(blockedUser);
 		mockServer.verify();
-	}	
-	
+	}
+
 	@Test
 	public void getBlockedUsers() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/list.json?cursor=-1"))
-			.andExpect(method(GET))
-			.andRespond(withSuccess(jsonResource("list-members"), APPLICATION_JSON));
+				.andExpect(method(GET))
+				.andRespond(withSuccess(jsonResource("list-members"), APPLICATION_JSON));
 		CursoredList<TwitterProfile> blockedUsers = twitter.blockOperations().getBlockedUsers();
 		assertBlockedUsers(blockedUsers);
 	}
-	
+
 	@Test
 	public void getBlockedUsersInCursor() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/list.json?cursor=332211"))
-			.andExpect(method(GET))
-			.andRespond(withSuccess(jsonResource("list-members"), APPLICATION_JSON));
+				.andExpect(method(GET))
+				.andRespond(withSuccess(jsonResource("list-members"), APPLICATION_JSON));
 		CursoredList<TwitterProfile> blockedUsers = twitter.blockOperations().getBlockedUsersInCursor(332211);
 		assertBlockedUsers(blockedUsers);
 	}
@@ -96,25 +97,25 @@ public class BlockTemplateTest extends AbstractTwitterApiTest {
 	@Test
 	public void getBlockedUserIds() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/ids.json?cursor=-1"))
-			.andExpect(method(GET))
-			.andRespond(withSuccess(jsonResource("blocked-user-ids"), APPLICATION_JSON));
+				.andExpect(method(GET))
+				.andRespond(withSuccess(jsonResource("blocked-user-ids"), APPLICATION_JSON));
 		CursoredList<Long> blockedUsers = twitter.blockOperations().getBlockedUserIds();
 		assertEquals(2, blockedUsers.size());
 		mockServer.verify();
 	}
-	
+
 	@Test
 	public void getBlockedUserIdsInCursor() {
 		mockServer.expect(requestTo("https://api.twitter.com/1.1/blocks/ids.json?cursor=332211"))
-			.andExpect(method(GET))
-			.andRespond(withSuccess(jsonResource("blocked-user-ids"), APPLICATION_JSON));
+				.andExpect(method(GET))
+				.andRespond(withSuccess(jsonResource("blocked-user-ids"), APPLICATION_JSON));
 		CursoredList<Long> blockedUsers = twitter.blockOperations().getBlockedUserIdsInCursor(332211);
 		assertEquals(2, blockedUsers.size());
 		mockServer.verify();
 	}
-	
+
 	// private helpers
-	
+
 	private void assertTwitterProfile(TwitterProfile blockedUser) {
 		assertEquals(161064614, blockedUser.getId());
 		assertEquals("artnames", blockedUser.getScreenName());
@@ -124,7 +125,7 @@ public class BlockTemplateTest extends AbstractTwitterApiTest {
 		assertEquals("http://www.springsource.org", blockedUser.getUrl());
 		assertEquals("http://a1.twimg.com/sticky/default_profile_images/default_profile_4_normal.png", blockedUser.getProfileImageUrl());
 	}
-	
+
 	private void assertBlockedUsers(CursoredList<TwitterProfile> friends) {
 		assertEquals(2, friends.size());
 		assertEquals("royclarkson", friends.get(0).getScreenName());

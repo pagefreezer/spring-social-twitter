@@ -16,6 +16,12 @@
 package org.springframework.social.twitter.api.impl;
 
 import org.springframework.social.oauth2.AbstractOAuth2ApiBinding;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
+import org.springframework.social.twitter.config.converter.TwitterMappingJackson2HttpMessageConverter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A utility implementation of an OAuth2 API binding used by TwitterTemplate to create an OAuth2
@@ -27,6 +33,16 @@ class ClientAuthorizedTwitterTemplate extends AbstractOAuth2ApiBinding {
 
 	public ClientAuthorizedTwitterTemplate(String clientToken) {
 		super(clientToken);
+	}
+
+	protected List<HttpMessageConverter<?>> getMessageConverters() {
+		List<HttpMessageConverter<?>> messageConverters = new ArrayList<HttpMessageConverter<?>>();
+		messageConverters.add(new StringHttpMessageConverter());
+		messageConverters.add(new TwitterMappingJackson2HttpMessageConverter());
+		messageConverters.add(getFormMessageConverter());
+		messageConverters.add(getJsonMessageConverter());
+		messageConverters.add(getByteArrayMessageConverter());
+		return messageConverters;
 	}
 
 }

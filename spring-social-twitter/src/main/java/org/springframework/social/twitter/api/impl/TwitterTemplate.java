@@ -15,26 +15,26 @@
  */
 package org.springframework.social.twitter.api.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.http.HttpRequest;
+import org.springframework.http.client.ClientHttpRequestExecution;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.social.oauth1.AbstractOAuth1ApiBinding;
 import org.springframework.social.oauth2.OAuth2Operations;
 import org.springframework.social.oauth2.OAuth2Template;
-import org.springframework.social.twitter.api.BlockOperations;
-import org.springframework.social.twitter.api.DirectMessageOperations;
-import org.springframework.social.twitter.api.FriendOperations;
-import org.springframework.social.twitter.api.GeoOperations;
-import org.springframework.social.twitter.api.ListOperations;
-import org.springframework.social.twitter.api.SearchOperations;
-import org.springframework.social.twitter.api.StreamingOperations;
-import org.springframework.social.twitter.api.TimelineOperations;
-import org.springframework.social.twitter.api.Twitter;
-import org.springframework.social.twitter.api.UserOperations;
+import org.springframework.social.twitter.api.*;
+import org.springframework.social.twitter.config.converter.TwitterMappingJackson2HttpMessageConverter;
 import org.springframework.util.Assert;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * This is the central class for interacting with Twitter.
@@ -47,7 +47,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author Craig Walls
  */
 public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter {
-	
+
+	private final static Log logger = LogFactory.getLog(TwitterTemplate.class);
+
 	private TimelineOperations timelineOperations;
 
 	private UserOperations userOperations;
@@ -59,15 +61,15 @@ public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter
 	private SearchOperations searchOperations;
 
 	private DirectMessageOperations directMessageOperations;
-	
+
 	private BlockOperations blockOperations;
-	
+
 	private GeoOperations geoOperations;
 
 	private StreamingOperations streamOperations;
-	
+
 	private RestTemplate clientRestTemplate = null;
-	
+
 	/**
 	 * Create a new instance of TwitterTemplate.
 	 * @param consumerKey the application's API key
@@ -77,9 +79,10 @@ public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter
 	 */
 	public TwitterTemplate(String consumerKey, String consumerSecret, String accessToken, String accessTokenSecret) {
 		super(consumerKey, consumerSecret, accessToken, accessTokenSecret);
+		configureInterceptors(getRestTemplate());
 		initSubApis();
 	}
-	
+
 	/**
 	 * Create a new instance of TwitterTemplate.
 	 * This instance of TwitterTemplate is limited to only performing operations requiring client authorization.
@@ -91,9 +94,10 @@ public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter
 		super();
 		Assert.notNull(clientToken, "Constructor argument 'clientToken' cannot be null.");
 		this.clientRestTemplate = createClientRestTemplate(clientToken);
+		configureInterceptors(clientRestTemplate);
 		initSubApis();
 	}
-	
+
 	/**
 	 * Create a new instance of TwitterTemplate.
 	 * This instance of TwitterTemplate is limited to only performing operations requiring client authorization.
@@ -129,11 +133,11 @@ public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter
 	public UserOperations userOperations() {
 		return userOperations;
 	}
-	
+
 	public BlockOperations blockOperations() {
 		return blockOperations;
 	}
-	
+
 	public GeoOperations geoOperations() {
 		return geoOperations;
 	}
@@ -145,7 +149,7 @@ public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter
 	public RestOperations restOperations() {
 		return getRestTemplate();
 	}
-	
+
 	// Override getRestTemplate() to return an app-authorized RestTemplate if a client token is available.
 	@Override
 	public RestTemplate getRestTemplate() {
@@ -156,37 +160,46 @@ public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter
 	}
 
 	// AbstractOAuth1ApiBinding hooks
-	
+
 	@Override
 	protected MappingJackson2HttpMessageConverter getJsonMessageConverter() {
-		MappingJackson2HttpMessageConverter converter = super.getJsonMessageConverter();
-		converter.setObjectMapper(new ObjectMapper().registerModule(new TwitterModule()));		
+		TwitterMappingJackson2HttpMessageConverter converter = new TwitterMappingJackson2HttpMessageConverter();//super.getJsonMessageConverter();
+		converter.setObjectMapper(new ObjectMapper().registerModule(new TwitterModule()));
 		return converter;
 	}
-	
+
 	@Override
-	protected FormHttpMessageConverter getFormMessageConverter() {		
+	protected FormHttpMessageConverter getFormMessageConverter() {
 		return new TwitterEscapingFormHttpMessageConverter();
 	}
-	
+
 	@Override
 	protected void configureRestTemplate(RestTemplate restTemplate) {
 		restTemplate.setErrorHandler(new TwitterErrorHandler());
 	}
-	
+
+	private void configureInterceptors(RestTemplate restTemplate) {
+		ClientHttpRequestInterceptor loggingInterceptor = new OperationsRequestLoggingInterceptor(restTemplate.hashCode());
+		if (restTemplate.getInterceptors() == null) {
+			restTemplate.setInterceptors(Arrays.asList(loggingInterceptor));
+		} else if (!restTemplate.getInterceptors().contains(loggingInterceptor)) {
+			restTemplate.getInterceptors().add(loggingInterceptor);
+		}
+	}
+
 	// private helper 
 	private static String exchangeCredentialsForClientToken(String consumerKey, String consumerSecret) {
 		OAuth2Template oauth2 = new OAuth2Template(consumerKey, consumerSecret, "", "https://api.twitter.com/oauth2/token");
 		return oauth2.authenticateClient().getAccessToken();
 	}
-	
+
 	private RestTemplate createClientRestTemplate(String clientToken) {
 		RestTemplate restTemplate = new ClientAuthorizedTwitterTemplate(clientToken).getRestTemplate();
 		restTemplate.setMessageConverters(getMessageConverters());
 		configureRestTemplate(restTemplate);
 		return restTemplate;
 	}
-		
+
 	private void initSubApis() {
 		this.userOperations = new UserTemplate(getRestTemplate(), isAuthorized(), isAuthorizedForApp());
 		this.directMessageOperations = new DirectMessageTemplate(getRestTemplate(), isAuthorized(), isAuthorizedForApp());
@@ -198,9 +211,43 @@ public class TwitterTemplate extends AbstractOAuth1ApiBinding implements Twitter
 		this.geoOperations = new GeoTemplate(getRestTemplate(), isAuthorized(), isAuthorizedForApp());
 		this.streamOperations = new StreamingTemplate(getRestTemplate(), isAuthorized(), isAuthorizedForApp());
 	}
-	
+
 	private boolean isAuthorizedForApp() {
 		return clientRestTemplate != null;
 	}
 
+
+	private class OperationsRequestLoggingInterceptor implements ClientHttpRequestInterceptor {
+		private final int id;
+		public OperationsRequestLoggingInterceptor(int id) {
+			this.id = id;
+		}
+
+		@Override
+		public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
+			ClientHttpResponse response = execution.execute(request, body);
+
+			logger.debug("Request: " + request.getMethod().name() + " " + request.getURI().toString());
+			logger.debug("Request body: " + (body.length == 0 ? "empty" : new String(body)));
+			logger.debug("Response: " + response.getRawStatusCode() + " " + response.getStatusText());
+//			logger.debug("Response body: " + (response.getRawStatusCode() != 200 ?
+//					"empty" : IOUtils.toString(response.getBody())));
+
+			return response;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (o == null || getClass() != o.getClass()) return false;
+			OperationsRequestLoggingInterceptor that = (OperationsRequestLoggingInterceptor) o;
+			return id == that.id;
+
+		}
+
+		@Override
+		public int hashCode() {
+			return id;
+		}
+	}
 }
