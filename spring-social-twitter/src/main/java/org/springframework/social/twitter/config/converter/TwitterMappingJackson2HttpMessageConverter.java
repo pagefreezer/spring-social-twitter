@@ -7,12 +7,14 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.apache.commons.io.IOUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
@@ -198,8 +200,17 @@ public class TwitterMappingJackson2HttpMessageConverter<T> extends MappingJackso
                 return;
             logger.debug("Remaining requests: " + remainingRequests);
             Long remaining = Long.valueOf(remainingRequests);
-            if (remaining <= 15) {
-                throw new ThresholdLimitReachedException();
+            if (headers.containsKey("X-Rate-Limit-Limit")) {
+                String requestsCeiling = headers.getFirst("X-Rate-Limit-Limit");
+                logger.debug("Requests ceiling: " + requestsCeiling);
+                Long ceiling = Long.valueOf(requestsCeiling);
+                if (ceiling > 15 && remaining <= 15) {
+                    throw new ThresholdLimitReachedException();
+                }
+            } else {
+                if (remaining <= 15) {
+                    throw new ThresholdLimitReachedException();
+                }
             }
         }
     }
